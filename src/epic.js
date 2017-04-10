@@ -119,17 +119,13 @@ export const createRequestEpic = (
 ) => {
   const { requestTypes, requestActions } = ducks;
   return (action$: any, store: any) =>
-    action$.ofType(requestTypes.REQUEST).mergeMap((action) => {
-      console.log(Observable);
-      console.log(Observable.fromPromise);
-      return Observable.fromPromise(api(action.params, store))
+    action$.ofType(requestTypes.REQUEST).mergeMap(action => Observable.fromPromise(api(action.params, store))
         .map(data => requestActions.success(data, action.params))
         .catch((error) => {
           console.error(error);
           console.error(JSON.stringify(error));
           return Observable.of(requestActions.failure(null, action.params));
-        });
-    });
+        }));
 };
 
 export const createRequestIfNeededEpic = (
