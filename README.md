@@ -1,16 +1,17 @@
 # redux-observable-utils
 
 * [createRequestEpicDucks](#createrequestepicducks)
+* [createRequestByKeyEpicDucks](#createrequestbykeyepicducks)
 
-## Getting started
-
-### Installation 
+## Installation 
 
 `npm install redux-utils`
 
-### Usage 
+## Usage 
 
-#### createRequestEpicDucks
+### createRequestEpicDucks
+
+used for simple api request
 
 * params 
   * `moduleName: string` module name which use to nest reducer in redux store
@@ -52,7 +53,7 @@
      * `reducerName: string` reducerName passed in 
   * `epic` epic function to be added into redux observable epic middleware
   
-example: 
+#### example: 
 
 ```javascript
 
@@ -69,7 +70,7 @@ example:
 
 ```
   
-usage example: 
+#### usage example: 
 
 ```javascript
 
@@ -87,7 +88,7 @@ const todos = createRequestEpicDucks({
 
 ```
 
-flow: 
+#### store example: 
 
 
 action TODO/TODOS_FETCH dispatched: 
@@ -136,4 +137,70 @@ TODO: Object
     payload: 'data'
   
 
+```
+
+
+### createRequestByKeyEpicDucks
+
+used for api request group by key
+
+* params 
+  * `moduleName: string` module name which use to nest reducer in redux store
+  * `reducerName: string` reducer name appeared in redux store
+  * `api: Function` function that return promise to get your payload
+  * `mapActionToKey: Function` function that map action to request key
+  * `mapActionToPayload: Function` (optional) default is `(action) => action.payload`
+  * `parentModuleName: string` (optional) parent module name which use to nest reducer in redux store
+  * `restoreFetchableKeyToAction: Function` function that map fetchable key back to action
+  * `options: Object` (optional) include fields:
+    * `cache: boolean` set to false to disable cache. default is true
+    * `cacheDuration: number` cache duration in millisecond. default is 300
+    
+* return
+  * `epic`
+    * `requestTypes: Object` same as in createRequestEpicDucks
+    * `requestActions: Object` same as in createRequestEpicDucks
+    * `reducer: Function` reducer function to be added into redux store
+    * `selector: Function` selector function to get data from store
+    * `reducerName: string` reducerName passed in 
+  * `epic` epic function to be added into redux observable epic middleware
+  
+#### usage example: 
+
+```javascript
+
+const todos = createRequestByKeyEpicDucks({
+  moduleName: 'TODO',
+  reducerName: 'TODO',
+  api: api.getTodos,
+  mapActionToKey: (action) => action.params.todoId,
+  mapActionToPayload: (action) => action.payload,
+  parentModuleName: 'HOME',
+  options: {
+    cache: true,
+    cacheDuration: 300,
+  },
+});
+
+```
+
+#### store example: 
+
+
+```javascript
+
+TODO: Object
+  TODO: Object
+    1: Object
+      didInvalidate: false
+      error: undefined
+      isFetching: true
+      payload: undefined
+    2: Object
+      didInvalidate: false
+      error: undefined
+      isFetching: true
+      payload: undefined
+
+// TODO object keys (1, 2) are todoId returned in mapActionToKey
 ```
