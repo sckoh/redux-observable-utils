@@ -24,7 +24,7 @@ used for simple api request
     * `cacheDuration: number` cache duration in millisecond. default is 300
     
 * return
-  * `epic`
+  * `ducks`
     * `requestTypes: Object` an object that includes redux types:
       * `FETCH` call api to fetch data, will check lastUpdated, didInvalidate, isFetching
       * `INVALIDATE` invalidate reducer so dispatching `FETCH` will call api again
@@ -157,7 +157,7 @@ used for api request group by key
     * `cacheDuration: number` cache duration in millisecond. default is 300
     
 * return
-  * `epic`
+  * `ducks`
     * `requestTypes: Object` same as in createRequestEpicDucks
     * `requestActions: Object` same as in createRequestEpicDucks
     * `reducer: Function` reducer function to be added into redux store
