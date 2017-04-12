@@ -64,6 +64,7 @@ export const createRequestByKeyEpicDucks = (
   const ducks = createRequestByKeyDucks({
     moduleName,
     reducerName,
+    mapActionToKey,
     mapActionToPayload,
     parentModuleName,
   });
