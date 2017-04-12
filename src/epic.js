@@ -161,7 +161,6 @@ export const createRequestByKeyIfNeededEpic = (
     restoreFetchableKeyToAction,
     options,
   });
-  const { requestTypes, requestActions } = ducks;
-  const requestEpic = createRequestEpic({ requestTypes, requestActions, api });
+  const requestEpic = createRequestEpic({ ducks, api });
   return combineEpics(fetchByKeyIfNeededEpic, requestEpic);
 };
