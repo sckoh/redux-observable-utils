@@ -2,6 +2,7 @@
 
 import 'rxjs';
 import moment from 'moment';
+import get from 'lodash/get';
 import { combineEpics } from 'redux-observable';
 import { Observable } from 'rxjs/Observable';
 import type {
@@ -54,12 +55,14 @@ export const getShouldFetchKeys = (state: any, keys: any, options: Object) => {
 const defaultOptions = {
   cache: true,
   cacheDuration: 300,
+  handleParamsPromiseReject: true,
+  handleParamsPromiseResolve: true,
 };
 
 export const createFetchIfNeededEpic = (
   {
     ducks,
-    options = defaultOptions,
+    options,
   }: FetchIfNeededEpicParam,
 ) => {
   const { requestTypes, requestActions, selector } = ducks;
@@ -82,7 +85,7 @@ export const createFetchByKeyIfNeededEpic = (
     ducks,
     mapActionToKey,
     restoreFetchableKeyToAction,
-    options = defaultOptions,
+    options,
   }: FetchByKeyIfNeededEpicParam,
 ) => {
   const { requestTypes, requestActions, selector } = ducks;
@@ -115,34 +118,45 @@ export const createRequestEpic = (
   {
     ducks,
     api,
+    options,
   }: RequestEpicParam,
 ) => {
   const { requestTypes, requestActions } = ducks;
   return (action$: any, store: any) =>
-    action$
-      .ofType(requestTypes.REQUEST)
-      .mergeMap(action =>
-        Observable.fromPromise(api(action.params, store))
-          .map(data => requestActions.success(data, action.params))
-          .catch((error) => {
-            console.error(error);
-            console.error(JSON.stringify(error));
-            return Observable.of(requestActions.failure(null, action.params));
-          }));
+    action$.ofType(requestTypes.REQUEST).mergeMap(action =>
+      Observable.fromPromise(api(action.params, store))
+        .map((data) => {
+          if (
+            get(action, 'params.resolve') && options.handleParamsPromiseResolve
+          ) {
+            action.params.resolve();
+          }
+          return requestActions.success(data, action.params);
+        })
+        .catch((error) => {
+          console.error(error);
+          console.error(JSON.stringify(error));
+          if (
+            get(action, 'params.reject') && options.handleParamsPromiseReject
+          ) {
+            action.params.reject();
+          }
+          return Observable.of(requestActions.failure(null, action.params));
+        }));
 };
 
 export const createRequestIfNeededEpic = (
   {
     ducks,
     api,
-    options,
+    options = defaultOptions,
   }: RequestEpicParam,
 ) => {
   const fetchItemsIfNeededEpic = createFetchIfNeededEpic({
     ducks,
     options,
   });
-  const requestEpic = createRequestEpic({ ducks, api });
+  const requestEpic = createRequestEpic({ ducks, api, options });
   return combineEpics(fetchItemsIfNeededEpic, requestEpic);
 };
 
@@ -152,7 +166,7 @@ export const createRequestByKeyIfNeededEpic = (
     api,
     mapActionToKey,
     restoreFetchableKeyToAction,
-    options,
+    options = defaultOptions,
   }: RequestByKeyEpicParam,
 ) => {
   const fetchByKeyIfNeededEpic = createFetchByKeyIfNeededEpic({
@@ -161,6 +175,6 @@ export const createRequestByKeyIfNeededEpic = (
     restoreFetchableKeyToAction,
     options,
   });
-  const requestEpic = createRequestEpic({ ducks, api });
+  const requestEpic = createRequestEpic({ ducks, api, options });
   return combineEpics(fetchByKeyIfNeededEpic, requestEpic);
 };

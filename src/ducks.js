@@ -44,6 +44,11 @@ export const createAction = (type: string, payload?: any = {}) => ({
   ...payload,
 });
 
+export const createNamePrefix = (
+  moduleName: string,
+  parentModuleName?: string,
+) => parentModuleName ? `${parentModuleName}.${moduleName}` : `${moduleName}`;
+
 export const createRequestActions = (requestTypes: RequestTypes) => ({
   fetch: (params?: Object = {}) => createAction(requestTypes.FETCH, { params }),
   invalidate: (params?: Object = {}) =>
