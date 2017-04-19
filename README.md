@@ -93,22 +93,12 @@ const todos = createRequestEpicDucks({
 
 action TODO/TODOS_FETCH dispatched: 
 
-check for didInvalidate, isFetching, lastUpdated,
+does not change the store, it is used in epic to dispatch TODO/TODOS_REQUEST if the criteria below is met.
 
 * if isFetching is true, REQUEST will not be dispatched
   * if lastUpdated is within cacheDuration, REQUEST will not be dispatched
     * if didInvalidate is false, REQUEST will not be dispatched
 
-```javascript
-
-TODO: Object
-  TODOS: Object
-    didInvalidate: false
-    error: undefined
-    isFetching: true
-    payload: undefined
-
-```
 
 action TODO/TODOS_REQUEST dispatched:
 
