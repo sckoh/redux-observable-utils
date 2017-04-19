@@ -191,7 +191,7 @@ export const createRequestReducerByKey = (
           ...keys.reduce(
             (obj, key) => {
               let payload;
-              if (action.payload) {
+              if (action.payload !== undefined) {
                 payload = mapActionToPayload(action, key);
               }
               obj[key] = createRequestReducer({ requestTypes })(state[key], {
