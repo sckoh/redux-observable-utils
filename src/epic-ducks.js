@@ -28,6 +28,7 @@ export const createRequestEpicDucks = (
     reducerName,
     mapActionToPayload,
     parentModuleName,
+    options,
   });
   const epic = createRequestIfNeededEpic({
     ducks,
@@ -67,6 +68,7 @@ export const createRequestByKeyEpicDucks = (
     mapActionToKey,
     mapActionToPayload,
     parentModuleName,
+    options,
   });
   const epic = createRequestByKeyIfNeededEpic({
     ducks,

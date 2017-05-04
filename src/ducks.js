@@ -2,6 +2,7 @@
 
 import moment from 'moment';
 import get from 'lodash/get';
+import set from 'lodash/set';
 import type {
   RequestTypes,
   FetchData,
@@ -17,6 +18,7 @@ const INVALIDATE = 'INVALIDATE';
 const CLEAR = 'CLEAR';
 const INVALIDATE_ALL = 'INVALIDATE_ALL';
 const CLEAR_ALL = 'CLEAR_ALL';
+const RESET_PAGING = 'RESET_PAGING';
 const REQUEST = 'REQUEST';
 const SUCCESS = 'SUCCESS';
 const FAILURE = 'FAILURE';
@@ -28,6 +30,7 @@ export const createRequestTypes = (base: string) =>
     CLEAR,
     INVALIDATE_ALL,
     CLEAR_ALL,
+    RESET_PAGING,
     REQUEST,
     SUCCESS,
     FAILURE,
@@ -58,6 +61,8 @@ export const createRequestActions = (requestTypes: RequestTypes) => ({
     createAction(requestTypes.INVALIDATE_ALL, { params }),
   clearAll: (params?: Object = {}) =>
     createAction(requestTypes.CLEAR_ALL, { params }),
+  resetPaging: (params?: Object = {}) =>
+    createAction(requestTypes.RESET_PAGING, { params }),
   request: (params?: Object = {}) =>
     createAction(requestTypes.REQUEST, { params }),
   success: (payload?: any, params?: Object = {}) =>
@@ -66,19 +71,37 @@ export const createRequestActions = (requestTypes: RequestTypes) => ({
     createAction(requestTypes.FAILURE, { error, params }),
 });
 
+const requestInitialState = {
+  isFetching: false,
+  didInvalidate: false,
+  payload: undefined,
+  error: undefined,
+  refreshing: false,
+};
+
+const pagingInitialState = {
+  page: 0,
+  itemsEnd: false,
+  paginationFetched: undefined,
+};
+
+const pagingRequestInitialState = {
+  ...requestInitialState,
+  ...pagingInitialState,
+};
+
 export const createRequestReducer = (
   {
     requestTypes,
-    initialState = {
-      isFetching: false,
-      didInvalidate: false,
-      payload: undefined,
-      error: undefined,
-    },
+    initialState,
     mapActionToPayload = action => action.payload,
+    options,
   }: RequestReducer,
-) =>
-  (state: FetchData = initialState, action: Action) => {
+) => {
+  const paging = get(options, 'paging');
+  const finalInitialState = initialState ||
+    (paging ? pagingRequestInitialState : requestInitialState);
+  return (state: FetchData = finalInitialState, action: Action) => {
     switch (action.type) {
       case requestTypes[INVALIDATE]:
         return {
@@ -88,33 +111,54 @@ export const createRequestReducer = (
       case requestTypes[CLEAR]:
       case requestTypes[CLEAR_ALL]:
         return {
-          ...initialState,
+          ...finalInitialState,
+        };
+      case requestTypes[RESET_PAGING]:
+        return {
+          ...state,
+          ...pagingInitialState,
         };
       case requestTypes[REQUEST]:
         return {
           ...state,
           isFetching: true,
+          refreshing: !!action.params.refreshing,
           didInvalidate: false,
         };
-      case requestTypes[SUCCESS]:
-        return {
+      case requestTypes[SUCCESS]: {
+        const newState = {
           ...state,
           isFetching: false,
+          refreshing: false,
           didInvalidate: false,
-          payload: mapActionToPayload(action),
           lastUpdated: moment(),
           error: undefined,
         };
+        const payload = mapActionToPayload(action);
+        if (paging && action.params.page !== 0) {
+          newState.payload = [...newState.payload, ...payload];
+        } else {
+          newState.payload = payload;
+        }
+        if (paging) {
+          newState.page = action.params.page + 1;
+          newState.itemsEnd = !get(payload, 'length');
+          set(newState, `paginationFetched.${action.params.page}`, true);
+        }
+        return newState;
+      }
       case requestTypes[FAILURE]:
         return {
           ...state,
           error: action.error,
           isFetching: false,
+          refreshing: false,
         };
       default:
         return state;
     }
   };
+};
 
 export const itemsById = (
   {
@@ -165,11 +209,20 @@ export const objectById = (
     }
   };
 
+const getRequestKeys = (action, mapActionToKey) => {
+  let keys = mapActionToKey(action);
+  if (keys && keys.constructor !== Array) {
+    keys = [keys];
+  }
+  return keys;
+};
+
 export const createRequestReducerByKey = (
   {
     requestTypes,
     mapActionToKey,
     mapActionToPayload = action => action.payload,
+    options,
   }: RequestReducerByKey,
 ) =>
   (state: any = {}, action: Action) => {
@@ -179,13 +232,11 @@ export const createRequestReducerByKey = (
         return {};
       case requestTypes[INVALIDATE]:
       case requestTypes[CLEAR]:
+      case requestTypes[RESET_PAGING]:
       case requestTypes[REQUEST]:
       case requestTypes[SUCCESS]:
       case requestTypes[FAILURE]: {
-        let keys = mapActionToKey(action);
-        if (keys && keys.constructor !== Array) {
-          keys = [keys];
-        }
+        const keys = getRequestKeys(action, mapActionToKey);
         return {
           ...state,
           ...keys.reduce(
@@ -194,10 +245,13 @@ export const createRequestReducerByKey = (
               if (action.payload !== undefined) {
                 payload = mapActionToPayload(action, key);
               }
-              obj[key] = createRequestReducer({ requestTypes })(state[key], {
-                ...action,
-                payload,
-              });
+              obj[key] = createRequestReducer({ requestTypes, options })(
+                state[key],
+                {
+                  ...action,
+                  payload,
+                },
+              );
               return obj;
             },
             {},
@@ -220,11 +274,16 @@ export const createRequestDucks = (
     reducerName,
     mapActionToPayload,
     parentModuleName,
+    options,
   }: RequestDucks,
 ) => {
   const requestTypes = createRequestTypes(`${moduleName}/${reducerName}`);
   const requestActions = createRequestActions(requestTypes);
-  const reducer = createRequestReducer({ requestTypes, mapActionToPayload });
+  const reducer = createRequestReducer({
+    requestTypes,
+    mapActionToPayload,
+    options,
+  });
   const modName = parentModuleName
     ? `${parentModuleName}.${moduleName}`
     : moduleName;
@@ -252,6 +311,7 @@ export const createRequestByKeyDucks = (
     mapActionToKey,
     mapActionToPayload,
     parentModuleName,
+    options,
   }: RequestByKeyDucks,
 ) => {
   const requestTypes = createRequestTypes(`${moduleName}/${reducerName}`);
@@ -260,6 +320,7 @@ export const createRequestByKeyDucks = (
     requestTypes,
     mapActionToKey,
     mapActionToPayload,
+    options,
   });
   const modName = parentModuleName
     ? `${parentModuleName}.${moduleName}`
