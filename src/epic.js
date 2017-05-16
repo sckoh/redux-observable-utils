@@ -207,7 +207,7 @@ export const createRequestEpic = (
           ) {
             action.params.reject();
           }
-          return Observable.of(requestActions.failure(null, action.params));
+          return Observable.of(requestActions.failure(error, action.params));
         }));
 };
 
