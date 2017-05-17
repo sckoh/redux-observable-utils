@@ -176,7 +176,10 @@ export const createFetchByKeyIfNeededEpic = (
       .map(action =>
         requestActions.request({
           ...action.params,
-          page: get(selector(store.getState()), 'page'),
+          page: get(
+            selector(store.getState()),
+            `${mapActionToKey(action)}.page`,
+          ) || 0,
         }));
 };
 
