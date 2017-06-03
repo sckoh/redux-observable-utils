@@ -115,23 +115,23 @@ const defaultOptions = {
   handleParamsPromiseResolve: true,
 };
 
-export const createFetchIfNeededEpic = (
-  {
-    ducks,
-    options,
-  }: FetchIfNeededEpicParam,
-) => {
+export const createFetchIfNeededEpic = ({
+  ducks,
+  options,
+}: FetchIfNeededEpicParam) => {
   const { requestTypes, requestActions, selector } = ducks;
   return (action$: any, store: any) =>
     action$
       .ofType(requestTypes.FETCH)
       .filter(action =>
-        shouldFetchIfNeeded(selector(store.getState()), options, action))
+        shouldFetchIfNeeded(selector(store.getState()), options, action),
+      )
       .map(action =>
         requestActions.request({
           ...action.params,
           page: get(selector(store.getState()), 'page'),
-        }));
+        }),
+      );
 };
 
 const shouldContinueFetch = (shouldFetchKeys) => {
@@ -141,14 +141,12 @@ const shouldContinueFetch = (shouldFetchKeys) => {
   return !!shouldFetchKeys;
 };
 
-export const createFetchByKeyIfNeededEpic = (
-  {
-    ducks,
-    mapActionToKey,
-    restoreFetchableKeyToAction,
-    options,
-  }: FetchByKeyIfNeededEpicParam,
-) => {
+export const createFetchByKeyIfNeededEpic = ({
+  ducks,
+  mapActionToKey,
+  restoreFetchableKeyToAction,
+  options,
+}: FetchByKeyIfNeededEpicParam) => {
   const { requestTypes, requestActions, selector } = ducks;
   return (action$: any, store: any) =>
     action$
@@ -173,23 +171,27 @@ export const createFetchByKeyIfNeededEpic = (
         return action;
       })
       .filter(action => action.shouldFetch)
-      .map(action =>
-        requestActions.request({
-          ...action.params,
-          page: get(
+      .map((action) => {
+        if (get(options, 'paging')) {
+          const result = get(
             selector(store.getState()),
-            `${mapActionToKey(action)}.page`,
-          ) || 0,
-        }));
+            mapActionToKey(action),
+          );
+          const page = get(result, 'page') || 0;
+          return requestActions.request({
+            ...action.params,
+            page,
+          });
+        }
+        return requestActions.request(action.params);
+      });
 };
 
-export const createRequestEpic = (
-  {
-    ducks,
-    api,
-    options,
-  }: RequestEpicParam,
-) => {
+export const createRequestEpic = ({
+  ducks,
+  api,
+  options,
+}: RequestEpicParam) => {
   const { requestTypes, requestActions } = ducks;
   return (action$: any, store: any) =>
     action$.ofType(requestTypes.REQUEST).mergeMap(action =>
@@ -211,16 +213,15 @@ export const createRequestEpic = (
             action.params.reject();
           }
           return Observable.of(requestActions.failure(error, action.params));
-        }));
+        }),
+    );
 };
 
-export const createRequestIfNeededEpic = (
-  {
-    ducks,
-    api,
-    options,
-  }: RequestEpicParam,
-) => {
+export const createRequestIfNeededEpic = ({
+  ducks,
+  api,
+  options,
+}: RequestEpicParam) => {
   const mergeOptions = {
     ...defaultOptions,
     ...options,
@@ -233,15 +234,13 @@ export const createRequestIfNeededEpic = (
   return combineEpics(fetchItemsIfNeededEpic, requestEpic);
 };
 
-export const createRequestByKeyIfNeededEpic = (
-  {
-    ducks,
-    api,
-    mapActionToKey,
-    restoreFetchableKeyToAction,
-    options = defaultOptions,
-  }: RequestByKeyEpicParam,
-) => {
+export const createRequestByKeyIfNeededEpic = ({
+  ducks,
+  api,
+  mapActionToKey,
+  restoreFetchableKeyToAction,
+  options = defaultOptions,
+}: RequestByKeyEpicParam) => {
   const mergeOptions = {
     ...defaultOptions,
     ...options,

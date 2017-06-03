@@ -5,7 +5,7 @@
 
 ## Installation 
 
-`npm install redux-utils`
+`npm install redux-observable-utils`
 
 ## Usage 
 
