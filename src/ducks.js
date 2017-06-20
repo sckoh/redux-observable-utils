@@ -168,7 +168,7 @@ export const itemsById = ({
   mapItemToId,
   mapActionToPayload = action => action.payload,
 }: ItemsByIdProps) => (state: any = {}, action: Action) => {
-  if (action.type === type || (types && types.indexOf(type) > -1)) {
+  if (action.type === type || (types && types.indexOf(action.type) > -1)) {
     return {
       ...state,
       ...mapActionToPayload(action).reduce((obj, item) => {
