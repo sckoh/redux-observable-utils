@@ -34,13 +34,10 @@ export const createRequestTypes = (base: string) =>
     REQUEST,
     SUCCESS,
     FAILURE,
-  ].reduce(
-    (acc, type) => {
-      acc[type] = `${base}_${type}`;
-      return acc;
-    },
-    {},
-  );
+  ].reduce((acc, type) => {
+    acc[type] = `${base}_${type}`;
+    return acc;
+  }, {});
 
 export const createAction = (type: string, payload?: any = {}) => ({
   type,
@@ -50,7 +47,7 @@ export const createAction = (type: string, payload?: any = {}) => ({
 export const createNamePrefix = (
   moduleName: string,
   parentModuleName?: string,
-) => parentModuleName ? `${parentModuleName}.${moduleName}` : `${moduleName}`;
+) => (parentModuleName ? `${parentModuleName}.${moduleName}` : `${moduleName}`);
 
 export const createRequestActions = (requestTypes: RequestTypes) => ({
   fetch: (params?: Object = {}) => createAction(requestTypes.FETCH, { params }),
@@ -90,17 +87,15 @@ const pagingRequestInitialState = {
   ...pagingInitialState,
 };
 
-export const createRequestReducer = (
-  {
-    requestTypes,
-    initialState,
-    mapActionToPayload = action => action.payload,
-    options,
-  }: RequestReducer,
-) => {
+export const createRequestReducer = ({
+  requestTypes,
+  initialState,
+  mapActionToPayload = action => action.payload,
+  options,
+}: RequestReducer) => {
   const paging = get(options, 'paging');
-  const finalInitialState = initialState ||
-    (paging ? pagingRequestInitialState : requestInitialState);
+  const finalInitialState =
+    initialState || (paging ? pagingRequestInitialState : requestInitialState);
   return (state: FetchData = finalInitialState, action: Action) => {
     switch (action.type) {
       case requestTypes[INVALIDATE]:
@@ -160,54 +155,49 @@ export const createRequestReducer = (
   };
 };
 
-export const itemsById = (
-  {
-    type,
-    mapItemToId,
-    mapActionToPayload = action => action.payload,
-  }: { type: string, mapItemToId: Function, mapActionToPayload?: Function },
-) => {
-  if (typeof type !== 'string') {
-    throw new Error('Expected type to be strings.');
-  }
-
-  return (state: any = {}, action: Action) => {
-    switch (action.type) {
-      case type:
-        return {
-          ...state,
-          ...mapActionToPayload(action).reduce(
-            (obj, item) => {
-              obj[mapItemToId(item)] = item;
-              return obj;
-            },
-            {},
-          ),
-        };
-      default:
-        return state;
-    }
-  };
+type ItemsByIdProps = {
+  types: Array<string>,
+  type: string,
+  mapItemToId: Function,
+  mapActionToPayload?: Function
 };
 
-export const objectById = (
-  {
-    type,
-    mapItemToId,
-    mapActionToPayload = action => action.payload,
-  }: { type: string, mapItemToId: Function, mapActionToPayload?: Function },
-) =>
-  (state: any = {}, action: Action) => {
-    switch (action.type) {
-      case type:
-        return {
-          ...state,
-          [mapItemToId(mapActionToPayload(action))]: mapActionToPayload(action),
-        };
-      default:
-        return state;
-    }
-  };
+export const itemsById = ({
+  type,
+  types,
+  mapItemToId,
+  mapActionToPayload = action => action.payload,
+}: ItemsByIdProps) => (state: any = {}, action: Action) => {
+  if (action.type === type || (types && types.indexOf(type) > -1)) {
+    return {
+      ...state,
+      ...mapActionToPayload(action).reduce((obj, item) => {
+        obj[mapItemToId(item)] = item;
+        return obj;
+      }, {}),
+    };
+  }
+  return state;
+};
+
+export const objectById = ({
+  type,
+  mapItemToId,
+  mapActionToPayload = action => action.payload,
+}: { type: string, mapItemToId: Function, mapActionToPayload?: Function }) => (
+  state: any = {},
+  action: Action,
+) => {
+  switch (action.type) {
+    case type:
+      return {
+        ...state,
+        [mapItemToId(mapActionToPayload(action))]: mapActionToPayload(action),
+      };
+    default:
+      return state;
+  }
+};
 
 const getRequestKeys = (action, mapActionToKey) => {
   let keys = mapActionToKey(action);
@@ -217,66 +207,58 @@ const getRequestKeys = (action, mapActionToKey) => {
   return keys;
 };
 
-export const createRequestReducerByKey = (
-  {
-    requestTypes,
-    mapActionToKey,
-    mapActionToPayload = action => action.payload,
-    options,
-  }: RequestReducerByKey,
-) =>
-  (state: any = {}, action: Action) => {
-    switch (action.type) {
-      case requestTypes[INVALIDATE_ALL]:
-      case requestTypes[CLEAR_ALL]:
-        return {};
-      case requestTypes[INVALIDATE]:
-      case requestTypes[CLEAR]:
-      case requestTypes[RESET_PAGING]:
-      case requestTypes[REQUEST]:
-      case requestTypes[SUCCESS]:
-      case requestTypes[FAILURE]: {
-        const keys = getRequestKeys(action, mapActionToKey);
-        return {
-          ...state,
-          ...keys.reduce(
-            (obj, key) => {
-              let payload;
-              if (action.payload !== undefined) {
-                payload = mapActionToPayload(action, key);
-              }
-              obj[key] = createRequestReducer({ requestTypes, options })(
-                state[key],
-                {
-                  ...action,
-                  payload,
-                },
-              );
-              return obj;
+export const createRequestReducerByKey = ({
+  requestTypes,
+  mapActionToKey,
+  mapActionToPayload = action => action.payload,
+  options,
+}: RequestReducerByKey) => (state: any = {}, action: Action) => {
+  switch (action.type) {
+    case requestTypes[INVALIDATE_ALL]:
+    case requestTypes[CLEAR_ALL]:
+      return {};
+    case requestTypes[INVALIDATE]:
+    case requestTypes[CLEAR]:
+    case requestTypes[RESET_PAGING]:
+    case requestTypes[REQUEST]:
+    case requestTypes[SUCCESS]:
+    case requestTypes[FAILURE]: {
+      const keys = getRequestKeys(action, mapActionToKey);
+      return {
+        ...state,
+        ...keys.reduce((obj, key) => {
+          let payload;
+          if (action.payload !== undefined) {
+            payload = mapActionToPayload(action, key);
+          }
+          obj[key] = createRequestReducer({ requestTypes, options })(
+            state[key],
+            {
+              ...action,
+              payload,
             },
-            {},
-          ),
-        };
-      }
-      default:
-        return state;
+          );
+          return obj;
+        }, {}),
+      };
     }
-  };
+    default:
+      return state;
+  }
+};
 
 // create request ducks
 // {
 //   isFetching: true,
 //   payload: undefined,
 // }
-export const createRequestDucks = (
-  {
-    moduleName,
-    reducerName,
-    mapActionToPayload,
-    parentModuleName,
-    options,
-  }: RequestDucks,
-) => {
+export const createRequestDucks = ({
+  moduleName,
+  reducerName,
+  mapActionToPayload,
+  parentModuleName,
+  options,
+}: RequestDucks) => {
   const requestTypes = createRequestTypes(`${moduleName}/${reducerName}`);
   const requestActions = createRequestActions(requestTypes);
   const reducer = createRequestReducer({
@@ -304,16 +286,14 @@ export const createRequestDucks = (
 //     payload: undefined,
 //   }
 // }
-export const createRequestByKeyDucks = (
-  {
-    moduleName,
-    reducerName,
-    mapActionToKey,
-    mapActionToPayload,
-    parentModuleName,
-    options,
-  }: RequestByKeyDucks,
-) => {
+export const createRequestByKeyDucks = ({
+  moduleName,
+  reducerName,
+  mapActionToKey,
+  mapActionToPayload,
+  parentModuleName,
+  options,
+}: RequestByKeyDucks) => {
   const requestTypes = createRequestTypes(`${moduleName}/${reducerName}`);
   const requestActions = createRequestActions(requestTypes);
   const reducer = createRequestReducerByKey({
