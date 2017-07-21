@@ -3,9 +3,11 @@
 import 'rxjs';
 import moment from 'moment';
 import get from 'lodash/get';
+import isArray from 'lodash/isArray';
 import { combineEpics } from 'redux-observable';
 import { Observable } from 'rxjs/Observable';
 import type {
+  Ducks,
   RequestEpicParam,
   RequestByKeyEpicParam,
   FetchIfNeededEpicParam,
@@ -254,3 +256,34 @@ export const createRequestByKeyIfNeededEpic = ({
   const requestEpic = createRequestEpic({ ducks, api, options: mergeOptions });
   return combineEpics(fetchByKeyIfNeededEpic, requestEpic);
 };
+
+type CacheEvictProps = {
+  conditionType: Array<string> | string,
+  ducks: Ducks,
+  filter?: Function
+};
+
+export const createCacheEvictEpic = ({
+  conditionType,
+  ducks,
+  filter,
+}: CacheEvictProps) => (action$: any, store: any) =>
+  action$
+    .filter((action) => {
+      if (action.type === conditionType) {
+        return true;
+      }
+      return isArray(conditionType) && conditionType.indexOf(action.type) > -1;
+    })
+    .filter(() => {
+      if (filter) {
+        return filter(store.getState());
+      }
+      return get(ducks.selector(store.getState()), 'payload') !== undefined;
+    })
+    .mergeMap(() =>
+      Observable.of(
+        ducks.requestActions.clear(),
+        ducks.requestActions.request(),
+      ),
+    );
