@@ -260,8 +260,46 @@ export const createRequestByKeyIfNeededEpic = ({
 type CacheEvictProps = {
   conditionType: Array<string> | string,
   ducks: Ducks,
-  filter?: Function
+  filter?: Function,
+  mapActionToKey?: Function,
+  mapActionToParams?: Function
 };
+
+export const createCacheRefreshEpic = ({
+  conditionType,
+  ducks,
+  filter,
+  mapActionToParams,
+  mapActionToKey,
+}: CacheEvictProps) => (action$: any, store: any) =>
+  action$
+    .filter((action) => {
+      if (action.type === conditionType) {
+        return true;
+      }
+      return isArray(conditionType) && conditionType.indexOf(action.type) > -1;
+    })
+    .filter((action) => {
+      if (filter) {
+        return filter(store.getState());
+      }
+      if (mapActionToParams && mapActionToKey) {
+        const key = mapActionToKey({
+          params: mapActionToParams(action),
+        });
+        return (
+          get(ducks.selector(store.getState(), key), 'payload') !== undefined
+        );
+      }
+      return get(ducks.selector(store.getState()), 'payload') !== undefined;
+    })
+    .mergeMap((action) => {
+      const params = mapActionToParams ? mapActionToParams(action) : {};
+      return Observable.of(
+        ducks.requestActions.clear(params),
+        ducks.requestActions.request(params),
+      );
+    });
 
 export const createCacheEvictEpic = ({
   conditionType,
@@ -281,9 +319,4 @@ export const createCacheEvictEpic = ({
       }
       return get(ducks.selector(store.getState()), 'payload') !== undefined;
     })
-    .mergeMap(() =>
-      Observable.of(
-        ducks.requestActions.clear(),
-        ducks.requestActions.request(),
-      ),
-    );
+    .mergeMap(() => Observable.of(ducks.requestActions.clearAll()));
