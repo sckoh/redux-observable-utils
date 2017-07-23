@@ -288,7 +288,8 @@ export const createCacheRefreshEpic = ({
           params: mapActionToParams(action),
         });
         return (
-          get(ducks.selector(store.getState(), key), 'payload') !== undefined
+          get(get(ducks.selector(store.getState()), key), 'payload') !==
+          undefined
         );
       }
       return get(ducks.selector(store.getState()), 'payload') !== undefined;
