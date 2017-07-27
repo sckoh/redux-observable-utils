@@ -285,7 +285,7 @@ export const createCacheRefreshEpic = ({
       }
       if (mapActionToParams && mapActionToKey) {
         const key = mapActionToKey({
-          params: mapActionToParams(action),
+          params: mapActionToParams(action, store.getState()),
         });
         return (
           get(get(ducks.selector(store.getState()), key), 'payload') !==
@@ -295,10 +295,12 @@ export const createCacheRefreshEpic = ({
       return get(ducks.selector(store.getState()), 'payload') !== undefined;
     })
     .mergeMap((action) => {
-      const params = mapActionToParams ? mapActionToParams(action) : {};
+      const params = mapActionToParams
+        ? mapActionToParams(action, store.getState())
+        : {};
       return Observable.of(
         ducks.requestActions.clear(params),
-        ducks.requestActions.request(params),
+        ducks.requestActions.fetch(params),
       );
     });
 
@@ -318,6 +320,6 @@ export const createCacheEvictEpic = ({
       if (filter) {
         return filter(store.getState());
       }
-      return get(ducks.selector(store.getState()), 'payload') !== undefined;
+      return true;
     })
     .mergeMap(() => Observable.of(ducks.requestActions.clearAll()));
