@@ -12,6 +12,7 @@ import type {
   RequestDucks,
   RequestByKeyDucks,
 } from './type';
+import { config } from './config';
 
 const FETCH = 'FETCH';
 const INVALIDATE = 'INVALIDATE';
@@ -44,24 +45,17 @@ export const createAction = (type: string, payload?: any = {}) => ({
   ...payload,
 });
 
-export const createNamePrefix = (
-  moduleName: string,
-  parentModuleName?: string,
-) => (parentModuleName ? `${parentModuleName}.${moduleName}` : `${moduleName}`);
+export const createNamePrefix = (moduleName: string, parentModuleName?: string) =>
+  parentModuleName ? `${parentModuleName}.${moduleName}` : `${moduleName}`;
 
 export const createRequestActions = (requestTypes: RequestTypes) => ({
   fetch: (params?: Object = {}) => createAction(requestTypes.FETCH, { params }),
-  invalidate: (params?: Object = {}) =>
-    createAction(requestTypes.INVALIDATE, { params }),
+  invalidate: (params?: Object = {}) => createAction(requestTypes.INVALIDATE, { params }),
   clear: (params?: Object = {}) => createAction(requestTypes.CLEAR, { params }),
-  invalidateAll: (params?: Object = {}) =>
-    createAction(requestTypes.INVALIDATE_ALL, { params }),
-  clearAll: (params?: Object = {}) =>
-    createAction(requestTypes.CLEAR_ALL, { params }),
-  resetPaging: (params?: Object = {}) =>
-    createAction(requestTypes.RESET_PAGING, { params }),
-  request: (params?: Object = {}) =>
-    createAction(requestTypes.REQUEST, { params }),
+  invalidateAll: (params?: Object = {}) => createAction(requestTypes.INVALIDATE_ALL, { params }),
+  clearAll: (params?: Object = {}) => createAction(requestTypes.CLEAR_ALL, { params }),
+  resetPaging: (params?: Object = {}) => createAction(requestTypes.RESET_PAGING, { params }),
+  request: (params?: Object = {}) => createAction(requestTypes.REQUEST, { params }),
   success: (payload?: any, params?: Object = {}) =>
     createAction(requestTypes.SUCCESS, { payload, params }),
   failure: (error?: any, params?: Object = {}) =>
@@ -159,7 +153,7 @@ type ItemsByIdProps = {
   types: Array<string>,
   type: string,
   mapItemToId: Function,
-  mapActionToPayload?: Function
+  mapActionToPayload?: Function,
 };
 
 export const itemsById = ({
@@ -184,10 +178,11 @@ export const objectById = ({
   type,
   mapItemToId,
   mapActionToPayload = action => action.payload,
-}: { type: string, mapItemToId: Function, mapActionToPayload?: Function }) => (
-  state: any = {},
-  action: Action,
-) => {
+}: {
+  type: string,
+  mapItemToId: Function,
+  mapActionToPayload?: Function,
+}) => (state: any = {}, action: Action) => {
   switch (action.type) {
     case type:
       return {
@@ -231,13 +226,10 @@ export const createRequestReducerByKey = ({
           if (action.payload !== undefined) {
             payload = mapActionToPayload(action, key);
           }
-          obj[key] = createRequestReducer({ requestTypes, options })(
-            state[key],
-            {
-              ...action,
-              payload,
-            },
-          );
+          obj[key] = createRequestReducer({ requestTypes, options })(state[key], {
+            ...action,
+            payload,
+          });
           return obj;
         }, {}),
       };
@@ -245,6 +237,13 @@ export const createRequestReducerByKey = ({
     default:
       return state;
   }
+};
+
+export const getSelector = (reducerName) => {
+  if (get(config, 'prefix')) {
+    return (state: any) => get(state, `${config.prefix}.${reducerName}`);
+  }
+  return (state: any) => get(state, `${reducerName}`);
 };
 
 // create request ducks
@@ -266,10 +265,8 @@ export const createRequestDucks = ({
     mapActionToPayload,
     options,
   });
-  const modName = parentModuleName
-    ? `${parentModuleName}.${moduleName}`
-    : moduleName;
-  const selector = (state: any) => get(state, `${modName}.${reducerName}`);
+  const modName = parentModuleName ? `${parentModuleName}.${moduleName}` : moduleName;
+  const selector = getSelector(`${modName}.${reducerName}`);
   return {
     requestTypes,
     requestActions,
@@ -302,10 +299,8 @@ export const createRequestByKeyDucks = ({
     mapActionToPayload,
     options,
   });
-  const modName = parentModuleName
-    ? `${parentModuleName}.${moduleName}`
-    : moduleName;
-  const selector = (state: any) => get(state, `${modName}.${reducerName}`);
+  const modName = parentModuleName ? `${parentModuleName}.${moduleName}` : moduleName;
+  const selector = getSelector(`${modName}.${reducerName}`);
   return {
     requestTypes,
     requestActions,
