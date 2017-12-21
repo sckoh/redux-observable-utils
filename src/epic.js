@@ -202,7 +202,7 @@ export const createRequestEpic = ({
           if (
             get(action, 'params.resolve') && options.handleParamsPromiseResolve
           ) {
-            action.params.resolve();
+            action.params.resolve(data);
           }
           return requestActions.success(data, action.params);
         })
@@ -212,7 +212,7 @@ export const createRequestEpic = ({
           if (
             get(action, 'params.reject') && options.handleParamsPromiseReject
           ) {
-            action.params.reject();
+            action.params.reject(error);
           }
           return Observable.of(requestActions.failure(error, action.params));
         }),
