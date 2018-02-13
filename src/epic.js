@@ -13,6 +13,7 @@ import type {
   FetchIfNeededEpicParam,
   FetchByKeyIfNeededEpicParam,
 } from './type';
+import { config } from './config';
 
 /*
 
@@ -29,11 +30,7 @@ import type {
 8. didInvalidate
 */
 
-const shouldFetchPageIfNeeded = (
-  state: Object,
-  options: Object,
-  action: Object,
-) => {
+const shouldFetchPageIfNeeded = (state: Object, options: Object, action: Object) => {
   const lastUpdated = moment(state.lastUpdated);
   if (
     lastUpdated.isValid() &&
@@ -57,11 +54,7 @@ const shouldFetchPageIfNeeded = (
   return state.didInvalidate;
 };
 
-const shouldFetchIfNeeded = (
-  state: Object,
-  options: Object,
-  action: Object,
-) => {
+const shouldFetchIfNeeded = (state: Object, options: Object, action: Object) => {
   if (!state) {
     return true;
   }
@@ -87,12 +80,7 @@ const shouldFetchIfNeeded = (
   return state.didInvalidate;
 };
 
-export const getShouldFetchKeys = (
-  state: any,
-  keys: any,
-  options: Object,
-  action: Object,
-) => {
+export const getShouldFetchKeys = (state: any, keys: any, options: Object, action: Object) => {
   if (keys && keys.constructor === Array) {
     const shouldFetchKeys = [];
     for (let i = 0; i < keys.length; i += 1) {
@@ -109,25 +97,12 @@ export const getShouldFetchKeys = (
   return undefined;
 };
 
-const defaultOptions = {
-  cache: true,
-  cacheDuration: 300,
-  paging: false,
-  handleParamsPromiseReject: true,
-  handleParamsPromiseResolve: true,
-};
-
-export const createFetchIfNeededEpic = ({
-  ducks,
-  options,
-}: FetchIfNeededEpicParam) => {
+export const createFetchIfNeededEpic = ({ ducks, options }: FetchIfNeededEpicParam) => {
   const { requestTypes, requestActions, selector } = ducks;
   return (action$: any, store: any) =>
     action$
       .ofType(requestTypes.FETCH)
-      .filter(action =>
-        shouldFetchIfNeeded(selector(store.getState()), options, action),
-      )
+      .filter(action => shouldFetchIfNeeded(selector(store.getState()), options, action))
       .map(action =>
         requestActions.request({
           ...action.params,
@@ -175,10 +150,7 @@ export const createFetchByKeyIfNeededEpic = ({
       .filter(action => action.shouldFetch)
       .map((action) => {
         if (get(options, 'paging')) {
-          const result = get(
-            selector(store.getState()),
-            mapActionToKey(action),
-          );
+          const result = get(selector(store.getState()), mapActionToKey(action));
           const page = get(result, 'page') || 0;
           return requestActions.request({
             ...action.params,
@@ -189,43 +161,38 @@ export const createFetchByKeyIfNeededEpic = ({
       });
 };
 
-export const createRequestEpic = ({
-  ducks,
-  api,
-  options,
-}: RequestEpicParam) => {
+export const createRequestEpic = ({ ducks, api, options }: RequestEpicParam) => {
   const { requestTypes, requestActions } = ducks;
-  return (action$: any, store: any) =>
+
+  const requestEpic = (action$: any, store: any) =>
     action$.ofType(requestTypes.REQUEST).mergeMap(action =>
       Observable.fromPromise(api(action.params, store))
         .map((data) => {
-          if (
-            get(action, 'params.resolve') && options.handleParamsPromiseResolve
-          ) {
+          if (get(action, 'params.resolve') && options.handleParamsPromiseResolve) {
             action.params.resolve(data);
           }
           return requestActions.success(data, action.params);
         })
         .catch((error) => {
-          console.error(error);
-          console.error(JSON.stringify(error));
-          if (
-            get(action, 'params.reject') && options.handleParamsPromiseReject
-          ) {
+          console.log(error);
+          console.log(JSON.stringify(error));
+          if (get(action, 'params.reject') && options.handleParamsPromiseReject) {
             action.params.reject(error);
           }
           return Observable.of(requestActions.failure(error, action.params));
         }),
     );
+
+  let handlerEpics = [];
+  if (options.handlers && options.handlers.length) {
+    handlerEpics = options.handlers.map(handler => handler(ducks));
+  }
+  return combineEpics(requestEpic, ...handlerEpics);
 };
 
-export const createRequestIfNeededEpic = ({
-  ducks,
-  api,
-  options,
-}: RequestEpicParam) => {
+export const createRequestIfNeededEpic = ({ ducks, api, options }: RequestEpicParam) => {
   const mergeOptions = {
-    ...defaultOptions,
+    ...config.requestOptions,
     ...options,
   };
   const fetchItemsIfNeededEpic = createFetchIfNeededEpic({
@@ -241,10 +208,10 @@ export const createRequestByKeyIfNeededEpic = ({
   api,
   mapActionToKey,
   restoreFetchableKeyToAction,
-  options = defaultOptions,
+  options = config.requestOptions,
 }: RequestByKeyEpicParam) => {
   const mergeOptions = {
-    ...defaultOptions,
+    ...config.requestOptions,
     ...options,
   };
   const fetchByKeyIfNeededEpic = createFetchByKeyIfNeededEpic({
@@ -262,7 +229,7 @@ type CacheEvictProps = {
   ducks: Ducks,
   filter?: Function,
   mapActionToKey?: Function,
-  mapActionToParams?: Function
+  mapActionToParams?: Function,
 };
 
 export const createCacheRefreshEpic = ({
@@ -287,28 +254,19 @@ export const createCacheRefreshEpic = ({
         const key = mapActionToKey({
           params: mapActionToParams(action, store.getState()),
         });
-        return (
-          get(get(ducks.selector(store.getState()), key), 'payload') !==
-          undefined
-        );
+        return get(get(ducks.selector(store.getState()), key), 'payload') !== undefined;
       }
       return get(ducks.selector(store.getState()), 'payload') !== undefined;
     })
     .mergeMap((action) => {
-      const params = mapActionToParams
-        ? mapActionToParams(action, store.getState())
-        : {};
-      return Observable.of(
-        ducks.requestActions.clear(params),
-        ducks.requestActions.fetch(params),
-      );
+      const params = mapActionToParams ? mapActionToParams(action, store.getState()) : {};
+      return Observable.of(ducks.requestActions.clear(params), ducks.requestActions.fetch(params));
     });
 
-export const createCacheEvictEpic = ({
-  conditionType,
-  ducks,
-  filter,
-}: CacheEvictProps) => (action$: any, store: any) =>
+export const createCacheEvictEpic = ({ conditionType, ducks, filter }: CacheEvictProps) => (
+  action$: any,
+  store: any,
+) =>
   action$
     .filter((action) => {
       if (action.type === conditionType) {

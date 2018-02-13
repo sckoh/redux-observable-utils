@@ -239,7 +239,7 @@ export const createRequestReducerByKey = ({
   }
 };
 
-export const getSelector = (reducerName) => {
+export const getSelector = (reducerName: string) => {
   if (get(config, 'prefix')) {
     return (state: any) => get(state, `${config.prefix}.${reducerName}`);
   }
