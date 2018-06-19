@@ -1,11 +1,11 @@
 // @flow
 
-import 'rxjs';
 import moment from 'moment';
 import get from 'lodash/get';
 import isArray from 'lodash/isArray';
-import { combineEpics } from 'redux-observable';
-import { Observable } from 'rxjs/Observable';
+import { combineEpics, ofType } from 'redux-observable';
+import { of, from } from 'rxjs';
+import { map, filter, catchError, mergeMap } from 'rxjs/operators';
 import type {
   Ducks,
   RequestEpicParam,
@@ -100,15 +100,16 @@ export const getShouldFetchKeys = (state: any, keys: any, options: Object, actio
 export const createFetchIfNeededEpic = ({ ducks, options }: FetchIfNeededEpicParam) => {
   const { requestTypes, requestActions, selector } = ducks;
   return (action$: any, store: any) =>
-    action$
-      .ofType(requestTypes.FETCH)
-      .filter(action => shouldFetchIfNeeded(selector(store.getState()), options, action))
-      .map(action =>
+    action$.pipe(
+      ofType(requestTypes.FETCH),
+      filter(action => shouldFetchIfNeeded(selector(store.getState()), options, action)),
+      map(action =>
         requestActions.request({
           ...action.params,
           page: get(selector(store.getState()), 'page'),
         }),
-      );
+      ),
+    );
 };
 
 const shouldContinueFetch = (shouldFetchKeys) => {
@@ -126,9 +127,9 @@ export const createFetchByKeyIfNeededEpic = ({
 }: FetchByKeyIfNeededEpicParam) => {
   const { requestTypes, requestActions, selector } = ducks;
   return (action$: any, store: any) =>
-    action$
-      .ofType(requestTypes.FETCH)
-      .map((_action) => {
+    action$.pipe(
+      ofType(requestTypes.FETCH),
+      map((_action) => {
         const action = {
           ..._action,
         };
@@ -146,9 +147,9 @@ export const createFetchByKeyIfNeededEpic = ({
           action.shouldFetch = true;
         }
         return action;
-      })
-      .filter(action => action.shouldFetch)
-      .map((action) => {
+      }),
+      filter(action => action.shouldFetch),
+      map((action) => {
         if (get(options, 'paging')) {
           const result = get(selector(store.getState()), mapActionToKey(action));
           const page = get(result, 'page') || 0;
@@ -158,29 +159,34 @@ export const createFetchByKeyIfNeededEpic = ({
           });
         }
         return requestActions.request(action.params);
-      });
+      }),
+    );
 };
 
 export const createRequestEpic = ({ ducks, api, options }: RequestEpicParam) => {
   const { requestTypes, requestActions } = ducks;
 
   const requestEpic = (action$: any, store: any) =>
-    action$.ofType(requestTypes.REQUEST).mergeMap(action =>
-      Observable.fromPromise(api(action.params, store))
-        .map((data) => {
-          if (get(action, 'params.resolve') && options.handleParamsPromiseResolve) {
-            action.params.resolve(data);
-          }
-          return requestActions.success(data, action.params);
-        })
-        .catch((error) => {
-          console.log(error);
-          console.log(JSON.stringify(error));
-          if (get(action, 'params.reject') && options.handleParamsPromiseReject) {
-            action.params.reject(error);
-          }
-          return Observable.of(requestActions.failure(error, action.params));
-        }),
+    action$.pipe(
+      ofType(requestTypes.REQUEST),
+      mergeMap(action =>
+        from(api(action.params, store)).pipe(
+          map((data) => {
+            if (get(action, 'params.resolve') && options.handleParamsPromiseResolve) {
+              action.params.resolve(data);
+            }
+            return requestActions.success(data, action.params);
+          }),
+          catchError((error) => {
+            console.log(error);
+            console.log(JSON.stringify(error));
+            if (get(action, 'params.reject') && options.handleParamsPromiseReject) {
+              action.params.reject(error);
+            }
+            return of(requestActions.failure(error, action.params));
+          }),
+        ),
+      ),
     );
 
   let handlerEpics = [];
@@ -235,20 +241,20 @@ type CacheEvictProps = {
 export const createCacheRefreshEpic = ({
   conditionType,
   ducks,
-  filter,
+  filter: refreshFilter,
   mapActionToParams,
   mapActionToKey,
 }: CacheEvictProps) => (action$: any, store: any) =>
-  action$
-    .filter((action) => {
+  action$.pipe(
+    filter((action) => {
       if (action.type === conditionType) {
         return true;
       }
       return isArray(conditionType) && conditionType.indexOf(action.type) > -1;
-    })
-    .filter((action) => {
-      if (filter) {
-        return filter(store.getState());
+    }),
+    filter((action) => {
+      if (refreshFilter) {
+        return refreshFilter(store.getState());
       }
       if (mapActionToParams && mapActionToKey) {
         const key = mapActionToKey({
@@ -257,27 +263,30 @@ export const createCacheRefreshEpic = ({
         return get(get(ducks.selector(store.getState()), key), 'payload') !== undefined;
       }
       return get(ducks.selector(store.getState()), 'payload') !== undefined;
-    })
-    .mergeMap((action) => {
+    }),
+    mergeMap((action) => {
       const params = mapActionToParams ? mapActionToParams(action, store.getState()) : {};
-      return Observable.of(ducks.requestActions.clear(params), ducks.requestActions.fetch(params));
-    });
+      return of(ducks.requestActions.clear(params), ducks.requestActions.fetch(params));
+    }),
+  );
 
-export const createCacheEvictEpic = ({ conditionType, ducks, filter }: CacheEvictProps) => (
-  action$: any,
-  store: any,
-) =>
-  action$
-    .filter((action) => {
+export const createCacheEvictEpic = ({
+  conditionType,
+  ducks,
+  filter: evictFilter,
+}: CacheEvictProps) => (action$: any, store: any) =>
+  action$.pipe(
+    filter((action) => {
       if (action.type === conditionType) {
         return true;
       }
       return isArray(conditionType) && conditionType.indexOf(action.type) > -1;
-    })
-    .filter(() => {
-      if (filter) {
-        return filter(store.getState());
+    }),
+    filter(() => {
+      if (evictFilter) {
+        return evictFilter(store.getState());
       }
       return true;
-    })
-    .mergeMap(() => Observable.of(ducks.requestActions.clearAll()));
+    }),
+    mergeMap(() => of(ducks.requestActions.clearAll())),
+  );
