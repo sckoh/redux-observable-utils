@@ -99,14 +99,14 @@ export const getShouldFetchKeys = (state: any, keys: any, options: Object, actio
 
 export const createFetchIfNeededEpic = ({ ducks, options }: FetchIfNeededEpicParam) => {
   const { requestTypes, requestActions, selector } = ducks;
-  return (action$: any, store: any) =>
+  return (action$: any, state$: any) =>
     action$.pipe(
       ofType(requestTypes.FETCH),
-      filter(action => shouldFetchIfNeeded(selector(store.getState()), options, action)),
+      filter(action => shouldFetchIfNeeded(selector(state$.value), options, action)),
       map(action =>
         requestActions.request({
           ...action.params,
-          page: get(selector(store.getState()), 'page'),
+          page: get(selector(state$.value), 'page'),
         }),
       ),
     );
@@ -126,7 +126,7 @@ export const createFetchByKeyIfNeededEpic = ({
   options,
 }: FetchByKeyIfNeededEpicParam) => {
   const { requestTypes, requestActions, selector } = ducks;
-  return (action$: any, store: any) =>
+  return (action$: any, state$: any) =>
     action$.pipe(
       ofType(requestTypes.FETCH),
       map((_action) => {
@@ -134,12 +134,7 @@ export const createFetchByKeyIfNeededEpic = ({
           ..._action,
         };
         const keys = mapActionToKey(action);
-        const shouldFetchKeys = getShouldFetchKeys(
-          selector(store.getState()),
-          keys,
-          options,
-          action,
-        );
+        const shouldFetchKeys = getShouldFetchKeys(selector(state$.value), keys, options, action);
         if (shouldContinueFetch(shouldFetchKeys)) {
           if (restoreFetchableKeyToAction) {
             restoreFetchableKeyToAction(action, shouldFetchKeys);
@@ -151,7 +146,7 @@ export const createFetchByKeyIfNeededEpic = ({
       filter(action => action.shouldFetch),
       map((action) => {
         if (get(options, 'paging')) {
-          const result = get(selector(store.getState()), mapActionToKey(action));
+          const result = get(selector(state$.value), mapActionToKey(action));
           const page = get(result, 'page') || 0;
           return requestActions.request({
             ...action.params,
@@ -244,7 +239,7 @@ export const createCacheRefreshEpic = ({
   filter: refreshFilter,
   mapActionToParams,
   mapActionToKey,
-}: CacheEvictProps) => (action$: any, store: any) =>
+}: CacheEvictProps) => (action$: any, state$: any) =>
   action$.pipe(
     filter((action) => {
       if (action.type === conditionType) {
@@ -254,18 +249,18 @@ export const createCacheRefreshEpic = ({
     }),
     filter((action) => {
       if (refreshFilter) {
-        return refreshFilter(store.getState());
+        return refreshFilter(state$.value);
       }
       if (mapActionToParams && mapActionToKey) {
         const key = mapActionToKey({
-          params: mapActionToParams(action, store.getState()),
+          params: mapActionToParams(action, state$.value),
         });
-        return get(get(ducks.selector(store.getState()), key), 'payload') !== undefined;
+        return get(get(ducks.selector(state$.value), key), 'payload') !== undefined;
       }
-      return get(ducks.selector(store.getState()), 'payload') !== undefined;
+      return get(ducks.selector(state$.value), 'payload') !== undefined;
     }),
     mergeMap((action) => {
-      const params = mapActionToParams ? mapActionToParams(action, store.getState()) : {};
+      const params = mapActionToParams ? mapActionToParams(action, state$.value) : {};
       return of(ducks.requestActions.clear(params), ducks.requestActions.fetch(params));
     }),
   );
@@ -274,7 +269,7 @@ export const createCacheEvictEpic = ({
   conditionType,
   ducks,
   filter: evictFilter,
-}: CacheEvictProps) => (action$: any, store: any) =>
+}: CacheEvictProps) => (action$: any, state$: any) =>
   action$.pipe(
     filter((action) => {
       if (action.type === conditionType) {
@@ -284,7 +279,7 @@ export const createCacheEvictEpic = ({
     }),
     filter(() => {
       if (evictFilter) {
-        return evictFilter(store.getState());
+        return evictFilter(state$.value);
       }
       return true;
     }),
