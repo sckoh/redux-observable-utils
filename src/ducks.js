@@ -1,6 +1,6 @@
 // @flow
 
-import moment from 'moment';
+import dayjs from 'dayjs';
 import get from 'lodash/get';
 import set from 'lodash/set';
 import type {
@@ -120,7 +120,7 @@ export const createRequestReducer = ({
           isFetching: false,
           refreshing: false,
           didInvalidate: false,
-          lastUpdated: moment(),
+          lastUpdated: dayjs(),
           error: undefined,
         };
         const payload = mapActionToPayload(action);

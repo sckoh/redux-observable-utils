@@ -1,6 +1,6 @@
 // @flow
 
-import moment from 'moment';
+import dayjs from 'dayjs';
 import get from 'lodash/get';
 import isArray from 'lodash/isArray';
 import { combineEpics, ofType } from 'redux-observable';
@@ -31,10 +31,10 @@ import { config } from './config';
 */
 
 const shouldFetchPageIfNeeded = (state: Object, options: Object, action: Object) => {
-  const lastUpdated = moment(state.lastUpdated);
+  const lastUpdated = dayjs(state.lastUpdated);
   if (
     lastUpdated.isValid() &&
-    lastUpdated.add(options.cacheDuration, 'seconds').isBefore(moment())
+    lastUpdated.add(options.cacheDuration, 'seconds').isBefore(dayjs())
   ) {
     action.params.page = 0; // reset page if data expired
     return true;
@@ -67,10 +67,10 @@ const shouldFetchIfNeeded = (state: Object, options: Object, action: Object) => 
   if (!options.cache) {
     return true;
   }
-  const lastUpdated = moment(state.lastUpdated);
+  const lastUpdated = dayjs(state.lastUpdated);
   if (
     lastUpdated.isValid() &&
-    lastUpdated.add(options.cacheDuration, 'seconds').isBefore(moment())
+    lastUpdated.add(options.cacheDuration, 'seconds').isBefore(dayjs())
   ) {
     return true;
   }
